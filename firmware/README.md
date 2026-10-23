@@ -83,6 +83,11 @@ Notes:
 
 ### esp32s3_154: ESP32-S3 Super Mini + generic 1.54" ST7789 (240x240)
 
+This board/panel combo was chosen because it was already on hand, sitting in
+a 3D-printed desktop enclosure designed for it -
+[Simple Print Monitor ST7789 1.54" Display Case](https://makerworld.com/en/models/2501721-simple-print-monitor-st7789-1-54-display-case)
+on MakerWorld.
+
 Pins match a proven-working config for this exact board+panel combo from a
 different project (BambuHelper, `src/display_ui.cpp` `LGFX_S3`) — not guessed
 from a datasheet. ESP32-S3 has no fixed default hardware-SPI pin mapping (any
