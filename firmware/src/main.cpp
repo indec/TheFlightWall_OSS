@@ -16,12 +16,12 @@ Configuration: UserConfiguration (location/filters/colors), TimingConfiguration 
 #include "adapters/OpenSkyFetcher.h"
 #include "adapters/AeroAPIFetcher.h"
 #include "core/FlightDataFetcher.h"
-#include "adapters/NeoMatrixDisplay.h"
+#include "adapters/TFTDisplay.h"
 
 static OpenSkyFetcher g_openSky;
 static AeroAPIFetcher g_aeroApi;
 static FlightDataFetcher *g_fetcher = nullptr;
-static NeoMatrixDisplay g_display;
+static TFTDisplay g_display;
 
 static unsigned long g_lastFetchMs = 0;
 
@@ -29,6 +29,15 @@ void setup()
 {
     Serial.begin(115200);
     delay(200);
+
+#ifdef RGB_BUILTIN
+    // Some boards (e.g. ESP32-S3 Super Mini) have an onboard addressable RGB
+    // status LED on this pin. Nothing in this firmware drives it on purpose;
+    // force it off so it doesn't stay lit/blinking from whatever state the
+    // bootloader or a library left it in. Guarded since not every board
+    // variant defines RGB_BUILTIN (e.g. the generic ESP-WROOM-32 doesn't).
+    rgbLedWrite(RGB_BUILTIN, 0, 0, 0);
+#endif
 
     g_display.initialize();
     g_display.displayMessage(String("FlightWall"));
@@ -72,6 +81,27 @@ void loop()
     if (now - g_lastFetchMs >= intervalMs)
     {
         g_lastFetchMs = now;
+
+        // --- SELF-TEST (hardware bring-up only) ---------------------------
+        // No WiFi configured/connected: render one fake flight so the TFT
+        // card layout can be verified without WiFi/API credentials. Delete
+        // this whole `if (WiFi.status() != WL_CONNECTED) { ... } else` wrapper
+        // (keeping just its `else` body) once WiFiConfiguration.h and
+        // APIConfiguration.h are filled in for real use.
+        if (WiFi.status() != WL_CONNECTED)
+        {
+            FlightInfo fake;
+            fake.ident = "UA123";
+            fake.airline_display_name_full = "United Airlines";
+            fake.aircraft_display_name_short = "B738";
+            fake.origin.code_icao = "KSFO";
+            fake.destination.code_icao = "KLAX";
+            Serial.println("SELF-TEST: no WiFi, rendering fake flight card");
+            g_display.displayFlights(std::vector<FlightInfo>{fake});
+            delay(10);
+            return;
+        }
+        // --- END SELF-TEST --------------------------------------------------
 
         std::vector<StateVector> states;
         std::vector<FlightInfo> flights;

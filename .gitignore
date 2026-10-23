@@ -2,3 +2,13 @@ misc
 .DS_Store
 .venv
 firmware/.pio
+*.swp
+
+# Local secrets/personal config - see the matching .h.example files for the
+# template. These were tracked upstream with empty placeholder values; once
+# filled in with real WiFi/API credentials and a real location they must
+# never be committed (this fork's overlay branch gets pushed to a public
+# GitHub fork).
+firmware/config/WiFiConfiguration.h
+firmware/config/APIConfiguration.h
+firmware/config/UserConfiguration.h

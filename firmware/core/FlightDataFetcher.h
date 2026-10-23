@@ -17,6 +17,18 @@ public:
                         std::vector<FlightInfo> &outFlights);
 
 private:
+    struct CacheEntry
+    {
+        String callsign;
+        FlightInfo info;
+        unsigned long cachedAtMs;
+    };
+
     BaseStateVectorFetcher *_stateFetcher;
     BaseFlightFetcher *_flightFetcher;
+    std::vector<CacheEntry> _cache;
+
+    bool getCached(const String &callsign, FlightInfo &outInfo);
+    void putCached(const String &callsign, const FlightInfo &info);
+    void pruneExpired();
 };

@@ -8,11 +8,75 @@ Output: Returns count of enriched flights and fills outStates/outFlights.
 */
 #include "core/FlightDataFetcher.h"
 #include "config/UserConfiguration.h"
+#include "config/TimingConfiguration.h"
 #include "adapters/FlightWallFetcher.h"
 
 FlightDataFetcher::FlightDataFetcher(BaseStateVectorFetcher *stateFetcher,
                                      BaseFlightFetcher *flightFetcher)
     : _stateFetcher(stateFetcher), _flightFetcher(flightFetcher) {}
+
+bool FlightDataFetcher::getCached(const String &callsign, FlightInfo &outInfo)
+{
+    const unsigned long now = millis();
+    const unsigned long ttlMs = TimingConfiguration::AEROAPI_CACHE_TTL_SECONDS * 1000UL;
+    for (const auto &entry : _cache)
+    {
+        if (entry.callsign == callsign && (now - entry.cachedAtMs) < ttlMs)
+        {
+            outInfo = entry.info;
+            return true;
+        }
+    }
+    return false;
+}
+
+void FlightDataFetcher::putCached(const String &callsign, const FlightInfo &info)
+{
+    for (auto &entry : _cache)
+    {
+        if (entry.callsign == callsign)
+        {
+            entry.info = info;
+            entry.cachedAtMs = millis();
+            return;
+        }
+    }
+
+    if (_cache.size() >= TimingConfiguration::AEROAPI_CACHE_MAX_ENTRIES)
+    {
+        // Bound memory use: evict the oldest entry rather than growing further.
+        size_t oldestIdx = 0;
+        unsigned long oldestMs = _cache[0].cachedAtMs;
+        for (size_t i = 1; i < _cache.size(); ++i)
+        {
+            if (_cache[i].cachedAtMs < oldestMs)
+            {
+                oldestMs = _cache[i].cachedAtMs;
+                oldestIdx = i;
+            }
+        }
+        _cache.erase(_cache.begin() + oldestIdx);
+    }
+
+    _cache.push_back(CacheEntry{callsign, info, millis()});
+}
+
+void FlightDataFetcher::pruneExpired()
+{
+    const unsigned long now = millis();
+    const unsigned long ttlMs = TimingConfiguration::AEROAPI_CACHE_TTL_SECONDS * 1000UL;
+    for (size_t i = 0; i < _cache.size();)
+    {
+        if (now - _cache[i].cachedAtMs >= ttlMs)
+        {
+            _cache.erase(_cache.begin() + i);
+        }
+        else
+        {
+            ++i;
+        }
+    }
+}
 
 size_t FlightDataFetcher::fetchFlights(std::vector<StateVector> &outStates,
                                        std::vector<FlightInfo> &outFlights)
@@ -28,6 +92,8 @@ size_t FlightDataFetcher::fetchFlights(std::vector<StateVector> &outStates,
     if (!ok)
         return 0;
 
+    pruneExpired();
+
     size_t enriched = 0;
     for (const StateVector &s : outStates)
     {
@@ -35,8 +101,11 @@ size_t FlightDataFetcher::fetchFlights(std::vector<StateVector> &outStates,
         {
             continue;
         }
+
         FlightInfo info;
-        if (_flightFetcher->fetchFlightInfo(s.callsign, info))
+        bool haveInfo = getCached(s.callsign, info);
+
+        if (!haveInfo && _flightFetcher->fetchFlightInfo(s.callsign, info))
         {
             FlightWallFetcher fw;
             if (info.operator_icao.length())
@@ -58,6 +127,12 @@ size_t FlightDataFetcher::fetchFlights(std::vector<StateVector> &outStates,
                     }
                 }
             }
+            putCached(s.callsign, info);
+            haveInfo = true;
+        }
+
+        if (haveInfo)
+        {
             outFlights.push_back(info);
             enriched++;
         }

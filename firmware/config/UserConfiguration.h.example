@@ -10,10 +10,10 @@ namespace UserConfiguration
     static const double RADIUS_KM = 10.0; // Search radius in km
 
     // Display customization
-    // Brightness controls overall display brightness (0-255)
-    static const uint8_t DISPLAY_BRIGHTNESS = 5;
+    // Brightness controls the TFT backlight PWM duty cycle (0-255)
+    static const uint8_t DISPLAY_BRIGHTNESS = 200;
 
-    // RGB color for all text rendering on the LED matrix
+    // RGB color for all text/border rendering on the display
     static const uint8_t TEXT_COLOR_R = 255;
     static const uint8_t TEXT_COLOR_G = 255;
     static const uint8_t TEXT_COLOR_B = 255;
